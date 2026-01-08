@@ -1,8 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   MagnifyingGlassIcon,
-  FunnelIcon,
   ArrowPathIcon,
   UserPlusIcon,
   StarIcon,
@@ -10,95 +9,9 @@ import {
   SparklesIcon,
   ExclamationTriangleIcon,
   UserIcon,
-  PhoneIcon,
-  EnvelopeIcon,
-  CalendarDaysIcon,
   CurrencyEuroIcon,
-  ChartBarIcon,
 } from '@heroicons/react/24/outline'
-import { StarIcon as StarSolid } from '@heroicons/react/24/solid'
-
-const segments = [
-  { id: 'all', name: 'Tutti', count: 1245, color: 'gray' },
-  { id: 'vip', name: 'VIP', count: 48, color: 'yellow', icon: StarIcon },
-  { id: 'loyal', name: 'Fedeli', count: 186, color: 'green', icon: HeartIcon },
-  { id: 'potential', name: 'Potenziali', count: 312, color: 'blue', icon: SparklesIcon },
-  { id: 'at_risk', name: 'A Rischio', count: 89, color: 'red', icon: ExclamationTriangleIcon },
-  { id: 'inactive', name: 'Inattivi', count: 234, color: 'gray', icon: UserIcon },
-]
-
-const customers = [
-  {
-    id: 1,
-    name: 'Marco Bianchi',
-    email: 'marco.bianchi@email.com',
-    phone: '+39 333 1234567',
-    segment: 'vip',
-    totalVisits: 45,
-    totalSpend: 2850,
-    avgSpend: 63.33,
-    lastVisit: '2024-01-05',
-    clvScore: 4200,
-    loyaltyScore: 92,
-    favoriteItems: ['Carbonara', 'Tiramisù'],
-  },
-  {
-    id: 2,
-    name: 'Anna Verdi',
-    email: 'anna.verdi@email.com',
-    phone: '+39 339 9876543',
-    segment: 'loyal',
-    totalVisits: 28,
-    totalSpend: 1680,
-    avgSpend: 60.00,
-    lastVisit: '2024-01-03',
-    clvScore: 2400,
-    loyaltyScore: 78,
-    favoriteItems: ['Risotto ai Funghi', 'Tagliata'],
-  },
-  {
-    id: 3,
-    name: 'Luigi Rossi',
-    email: 'luigi.rossi@email.com',
-    phone: '+39 347 5555555',
-    segment: 'potential',
-    totalVisits: 8,
-    totalSpend: 520,
-    avgSpend: 65.00,
-    lastVisit: '2024-01-02',
-    clvScore: 1200,
-    loyaltyScore: 55,
-    favoriteItems: ['Antipasto Misto'],
-  },
-  {
-    id: 4,
-    name: 'Carla Neri',
-    email: 'carla.neri@email.com',
-    phone: '+39 320 1111111',
-    segment: 'at_risk',
-    totalVisits: 15,
-    totalSpend: 890,
-    avgSpend: 59.33,
-    lastVisit: '2023-11-15',
-    clvScore: 800,
-    loyaltyScore: 35,
-    favoriteItems: ['Pizza Margherita'],
-  },
-  {
-    id: 5,
-    name: 'Giuseppe Gialli',
-    email: 'giuseppe.g@email.com',
-    phone: '+39 328 2222222',
-    segment: 'inactive',
-    totalVisits: 3,
-    totalSpend: 150,
-    avgSpend: 50.00,
-    lastVisit: '2023-08-20',
-    clvScore: 200,
-    loyaltyScore: 15,
-    favoriteItems: [],
-  },
-]
+import { customersApi } from '../services/api'
 
 const segmentConfig = {
   vip: {
@@ -136,10 +49,17 @@ const segmentConfig = {
     borderColor: 'border-gray-200',
     icon: UserIcon,
   },
+  new: {
+    label: 'Nuovo',
+    bgColor: 'bg-purple-50',
+    textColor: 'text-purple-700',
+    borderColor: 'border-purple-200',
+    icon: SparklesIcon,
+  },
 }
 
 function SegmentBadge({ segment }) {
-  const config = segmentConfig[segment]
+  const config = segmentConfig[segment] || segmentConfig.inactive
   const Icon = config.icon
 
   return (
@@ -151,8 +71,6 @@ function SegmentBadge({ segment }) {
 }
 
 function CustomerCard({ customer }) {
-  const config = segmentConfig[customer.segment]
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -162,68 +80,34 @@ function CustomerCard({ customer }) {
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary-400 to-accent-400 flex items-center justify-center text-white font-semibold">
-            {customer.name.split(' ').map(n => n[0]).join('')}
+            {customer.name?.split(' ').map(n => n[0]).join('').slice(0, 2) || '?'}
           </div>
           <div>
             <h3 className="font-semibold text-gray-900">{customer.name}</h3>
-            <p className="text-sm text-gray-500">{customer.email}</p>
+            <p className="text-sm text-gray-500">{customer.phone}</p>
           </div>
         </div>
-        <SegmentBadge segment={customer.segment} />
+        {customer.segment_id && <SegmentBadge segment={customer.segment_type || 'inactive'} />}
       </div>
 
-      <div className="mt-5 grid grid-cols-4 gap-4">
+      <div className="mt-5 grid grid-cols-3 gap-4">
         <div>
-          <p className="text-xs text-gray-500">Visite</p>
-          <p className="text-lg font-semibold text-gray-900">{customer.totalVisits}</p>
+          <p className="text-xs text-gray-500">ID</p>
+          <p className="text-lg font-semibold text-gray-900">#{customer.id}</p>
         </div>
         <div>
-          <p className="text-xs text-gray-500">Totale Speso</p>
-          <p className="text-lg font-semibold text-gray-900">€{customer.totalSpend}</p>
-        </div>
-        <div>
-          <p className="text-xs text-gray-500">Media</p>
-          <p className="text-lg font-semibold text-gray-900">€{customer.avgSpend.toFixed(0)}</p>
+          <p className="text-xs text-gray-500">Segmento</p>
+          <p className="text-lg font-semibold text-gray-900">{customer.segment_id || '-'}</p>
         </div>
         <div>
           <p className="text-xs text-gray-500">CLV</p>
-          <p className="text-lg font-semibold text-primary-600">€{customer.clvScore}</p>
+          <p className="text-lg font-semibold text-primary-600">€{customer.clv_score?.toFixed(0) || '0'}</p>
         </div>
       </div>
-
-      {/* Loyalty Score Bar */}
-      <div className="mt-4">
-        <div className="flex items-center justify-between text-xs mb-1">
-          <span className="text-gray-500">Fedeltà</span>
-          <span className="font-medium text-gray-700">{customer.loyaltyScore}%</span>
-        </div>
-        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-500 ${
-              customer.loyaltyScore >= 70 ? 'bg-green-500' :
-              customer.loyaltyScore >= 40 ? 'bg-amber-500' : 'bg-red-500'
-            }`}
-            style={{ width: `${customer.loyaltyScore}%` }}
-          />
-        </div>
-      </div>
-
-      {customer.favoriteItems.length > 0 && (
-        <div className="mt-4">
-          <p className="text-xs text-gray-500 mb-2">Piatti preferiti</p>
-          <div className="flex flex-wrap gap-1.5">
-            {customer.favoriteItems.map((item, i) => (
-              <span key={i} className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-md">
-                {item}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
         <span className="text-xs text-gray-500">
-          Ultima visita: {new Date(customer.lastVisit).toLocaleDateString('it-IT')}
+          {customer.whatsapp_number ? `WhatsApp: ${customer.whatsapp_number}` : 'No WhatsApp'}
         </span>
         <button className="btn btn-secondary text-xs py-1.5 px-3">
           Vedi Profilo
@@ -233,19 +117,100 @@ function CustomerCard({ customer }) {
   )
 }
 
+function LoadingSkeleton() {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {[...Array(6)].map((_, i) => (
+        <div key={i} className="card p-5 animate-pulse">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-gray-200" />
+            <div className="space-y-2">
+              <div className="h-5 w-32 bg-gray-200 rounded" />
+              <div className="h-4 w-24 bg-gray-100 rounded" />
+            </div>
+          </div>
+          <div className="mt-5 grid grid-cols-3 gap-4">
+            {[...Array(3)].map((_, j) => (
+              <div key={j}>
+                <div className="h-3 w-12 bg-gray-100 rounded mb-1" />
+                <div className="h-6 w-16 bg-gray-200 rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function Customers() {
   const [activeSegment, setActiveSegment] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [segmenting, setSegmenting] = useState(false)
+  const [error, setError] = useState(null)
+  const [customers, setCustomers] = useState([])
+  const [segmentsSummary, setSegmentsSummary] = useState([])
 
+  const fetchData = async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const [customersRes, segmentsRes] = await Promise.allSettled([
+        customersApi.list(),
+        customersApi.getSegmentsSummary(),
+      ])
+
+      setCustomers(customersRes.status === 'fulfilled' ? customersRes.value : [])
+      setSegmentsSummary(segmentsRes.status === 'fulfilled' ? segmentsRes.value : [])
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const runSegmentation = async () => {
+    setSegmenting(true)
+    try {
+      await customersApi.runSegmentation()
+      await fetchData()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSegmenting(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  // Build segments from API data
+  const segments = [
+    { id: 'all', name: 'Tutti', count: customers.length, color: 'gray' },
+    ...segmentsSummary.map(seg => ({
+      id: seg.type,
+      name: seg.segment,
+      count: seg.customer_count,
+      color: segmentConfig[seg.type]?.textColor || 'gray',
+      icon: segmentConfig[seg.type]?.icon,
+    })),
+  ]
+
+  // Filter customers
   const filteredCustomers = customers.filter(c => {
-    const matchesSegment = activeSegment === 'all' || c.segment === activeSegment
-    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         c.email.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesSegment && matchesSearch
+    const matchesSegment = activeSegment === 'all' ||
+      (c.segment_id && segmentsSummary.find(s => s.type === activeSegment)?.segment === c.segment_id)
+    const matchesSearch = c.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         c.phone?.toLowerCase().includes(searchQuery.toLowerCase())
+    return matchesSearch && (activeSegment === 'all' || matchesSegment)
   })
 
-  const totalClv = customers.reduce((sum, c) => sum + c.clvScore, 0)
-  const avgLoyalty = Math.round(customers.reduce((sum, c) => sum + c.loyaltyScore, 0) / customers.length)
+  // Stats
+  const totalClv = customers.reduce((sum, c) => sum + (c.clv_score || 0), 0)
+  const atRiskCount = segmentsSummary.find(s => s.type === 'at_risk')?.customer_count || 0
 
   return (
     <div className="space-y-6">
@@ -256,9 +221,13 @@ export default function Customers() {
           <p className="section-subtitle">Gestisci la tua base clienti e segmentazione</p>
         </div>
         <div className="flex gap-3">
-          <button className="btn btn-secondary gap-2">
-            <ArrowPathIcon className="w-4 h-4" />
-            Aggiorna Segmenti
+          <button
+            className="btn btn-secondary gap-2"
+            onClick={runSegmentation}
+            disabled={segmenting}
+          >
+            <ArrowPathIcon className={`w-4 h-4 ${segmenting ? 'animate-spin' : ''}`} />
+            {segmenting ? 'Segmentazione...' : 'Aggiorna Segmenti'}
           </button>
           <button className="btn btn-primary gap-2">
             <UserPlusIcon className="w-4 h-4" />
@@ -266,6 +235,13 @@ export default function Customers() {
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={fetchData} className="btn btn-secondary text-xs">Riprova</button>
+        </div>
+      )}
 
       {/* Overview Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -275,7 +251,7 @@ export default function Customers() {
               <UserIcon className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">1,245</p>
+              <p className="text-2xl font-bold text-gray-900">{customers.length}</p>
               <p className="text-sm text-gray-500">Clienti Totali</p>
             </div>
           </div>
@@ -286,7 +262,9 @@ export default function Customers() {
               <CurrencyEuroIcon className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">€{(totalClv/1000).toFixed(0)}k</p>
+              <p className="text-2xl font-bold text-gray-900">
+                €{totalClv >= 1000 ? `${(totalClv/1000).toFixed(1)}k` : totalClv.toFixed(0)}
+              </p>
               <p className="text-sm text-gray-500">CLV Totale</p>
             </div>
           </div>
@@ -297,8 +275,8 @@ export default function Customers() {
               <HeartIcon className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">{avgLoyalty}%</p>
-              <p className="text-sm text-gray-500">Fedeltà Media</p>
+              <p className="text-2xl font-bold text-gray-900">{segmentsSummary.length}</p>
+              <p className="text-sm text-gray-500">Segmenti</p>
             </div>
           </div>
         </div>
@@ -308,14 +286,42 @@ export default function Customers() {
               <ExclamationTriangleIcon className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">89</p>
+              <p className="text-2xl font-bold text-gray-900">{atRiskCount}</p>
               <p className="text-sm text-gray-500">A Rischio</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Segment Tabs */}
+      {/* Segments Summary Cards */}
+      {segmentsSummary.length > 0 && (
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          {segmentsSummary.map(seg => {
+            const config = segmentConfig[seg.type] || segmentConfig.inactive
+            const Icon = config.icon
+            return (
+              <div key={seg.type} className={`card p-4 ${config.bgColor} border ${config.borderColor}`}>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-white/60">
+                    <Icon className={`w-5 h-5 ${config.textColor}`} />
+                  </div>
+                  <div>
+                    <p className={`text-xl font-bold ${config.textColor}`}>{seg.customer_count}</p>
+                    <p className="text-sm text-gray-600">{seg.segment}</p>
+                  </div>
+                </div>
+                {seg.total_value > 0 && (
+                  <p className="text-xs text-gray-500 mt-2">
+                    Valore: €{seg.total_value.toFixed(0)}
+                  </p>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Search and Filter */}
       <div className="card p-4">
         <div className="flex flex-col lg:flex-row gap-4">
           {/* Search */}
@@ -365,16 +371,24 @@ export default function Customers() {
       </div>
 
       {/* Customer Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {filteredCustomers.map((customer) => (
-          <CustomerCard key={customer.id} customer={customer} />
-        ))}
-      </div>
+      {loading ? (
+        <LoadingSkeleton />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {filteredCustomers.map((customer) => (
+            <CustomerCard key={customer.id} customer={customer} />
+          ))}
+        </div>
+      )}
 
-      {filteredCustomers.length === 0 && (
+      {!loading && filteredCustomers.length === 0 && (
         <div className="card p-12 text-center">
           <UserIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500">Nessun cliente trovato</p>
+          <p className="text-gray-500">
+            {customers.length === 0
+              ? 'Nessun cliente nel database. Aggiungi clienti tramite prenotazioni o manualmente.'
+              : 'Nessun cliente trovato con i filtri selezionati'}
+          </p>
         </div>
       )}
     </div>

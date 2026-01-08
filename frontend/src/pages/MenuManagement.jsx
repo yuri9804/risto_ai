@@ -1,12 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   PlusIcon,
   MagnifyingGlassIcon,
-  FunnelIcon,
   SparklesIcon,
   ArrowPathIcon,
-  ChevronDownIcon,
   StarIcon,
   BoltIcon,
   PuzzlePieceIcon,
@@ -15,90 +13,7 @@ import {
   TrashIcon,
   EyeIcon,
 } from '@heroicons/react/24/outline'
-import { StarIcon as StarSolid } from '@heroicons/react/24/solid'
-
-const categories = [
-  { id: 'all', name: 'Tutti', count: 30 },
-  { id: 'antipasti', name: 'Antipasti', count: 8 },
-  { id: 'primi', name: 'Primi', count: 10 },
-  { id: 'secondi', name: 'Secondi', count: 7 },
-  { id: 'dolci', name: 'Dolci', count: 5 },
-]
-
-const menuItems = [
-  {
-    id: 1,
-    name: 'Carbonara Tradizionale',
-    category: 'Primi',
-    price: 14.00,
-    cost: 4.20,
-    margin: 70,
-    classification: 'star',
-    popularity: 95,
-    soldToday: 45,
-    isActive: true,
-  },
-  {
-    id: 2,
-    name: 'Tagliata di Manzo',
-    category: 'Secondi',
-    price: 24.00,
-    cost: 10.80,
-    margin: 55,
-    classification: 'star',
-    popularity: 88,
-    soldToday: 38,
-    isActive: true,
-  },
-  {
-    id: 3,
-    name: 'Antipasto della Casa',
-    category: 'Antipasti',
-    price: 12.00,
-    cost: 5.40,
-    margin: 55,
-    classification: 'plow_horse',
-    popularity: 72,
-    soldToday: 28,
-    isActive: true,
-  },
-  {
-    id: 4,
-    name: 'Risotto ai Funghi Porcini',
-    category: 'Primi',
-    price: 16.00,
-    cost: 4.80,
-    margin: 70,
-    classification: 'puzzle',
-    popularity: 35,
-    soldToday: 8,
-    isActive: true,
-  },
-  {
-    id: 5,
-    name: 'Tiramisù',
-    category: 'Dolci',
-    price: 7.00,
-    cost: 1.75,
-    margin: 75,
-    classification: 'star',
-    popularity: 82,
-    soldToday: 32,
-    isActive: true,
-  },
-  {
-    id: 6,
-    name: 'Insalata di Mare',
-    category: 'Antipasti',
-    price: 18.00,
-    cost: 9.90,
-    margin: 45,
-    classification: 'dog',
-    popularity: 22,
-    soldToday: 5,
-    isActive: true,
-  },
-]
+import { menuApi } from '../services/api'
 
 const classificationConfig = {
   star: {
@@ -136,7 +51,7 @@ const classificationConfig = {
 }
 
 function ClassificationBadge({ classification }) {
-  const config = classificationConfig[classification]
+  const config = classificationConfig[classification?.toLowerCase()] || classificationConfig.dog
   const Icon = config.icon
 
   return (
@@ -148,6 +63,9 @@ function ClassificationBadge({ classification }) {
 }
 
 function MenuItemCard({ item }) {
+  const margin = item.margin_percentage || 0
+  const popularity = Math.round((item.popularity_index || 0) * 100)
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -158,9 +76,6 @@ function MenuItemCard({ item }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-gray-900 truncate">{item.name}</h3>
-            {!item.isActive && (
-              <span className="badge bg-gray-100 text-gray-600">Inattivo</span>
-            )}
           </div>
           <p className="text-sm text-gray-500 mt-0.5">{item.category}</p>
         </div>
@@ -169,32 +84,44 @@ function MenuItemCard({ item }) {
 
       <div className="mt-4 grid grid-cols-3 gap-4">
         <div>
-          <p className="text-xs text-gray-500">Prezzo</p>
-          <p className="text-sm font-semibold text-gray-900">€{item.price.toFixed(2)}</p>
+          <p className="text-xs text-gray-500">Ricavo Totale</p>
+          <p className="text-sm font-semibold text-gray-900">€{item.total_revenue?.toFixed(2) || '0.00'}</p>
         </div>
         <div>
           <p className="text-xs text-gray-500">Margine</p>
-          <p className="text-sm font-semibold text-gray-900">{item.margin}%</p>
+          <p className="text-sm font-semibold text-gray-900">{margin.toFixed(1)}%</p>
         </div>
         <div>
-          <p className="text-xs text-gray-500">Venduti oggi</p>
-          <p className="text-sm font-semibold text-gray-900">{item.soldToday}</p>
+          <p className="text-xs text-gray-500">Venduti</p>
+          <p className="text-sm font-semibold text-gray-900">{item.quantity_sold || 0}</p>
         </div>
       </div>
 
       {/* Popularity bar */}
       <div className="mt-4">
         <div className="flex items-center justify-between text-xs mb-1">
-          <span className="text-gray-500">Popolarità</span>
-          <span className="font-medium text-gray-700">{item.popularity}%</span>
+          <span className="text-gray-500">Indice Popolarità</span>
+          <span className="font-medium text-gray-700">{popularity}%</span>
         </div>
         <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
           <div
             className="h-full bg-primary-500 rounded-full transition-all duration-500"
-            style={{ width: `${item.popularity}%` }}
+            style={{ width: `${Math.min(popularity, 100)}%` }}
           />
         </div>
       </div>
+
+      {/* Additional stats */}
+      {(item.avg_rating || item.reorder_rate) && (
+        <div className="mt-3 flex gap-4 text-xs text-gray-500">
+          {item.avg_rating && (
+            <span>Rating: <strong className="text-gray-700">{item.avg_rating.toFixed(1)}/5</strong></span>
+          )}
+          {item.reorder_rate && (
+            <span>Reorder: <strong className="text-gray-700">{(item.reorder_rate * 100).toFixed(0)}%</strong></span>
+          )}
+        </div>
+      )}
 
       {/* Actions */}
       <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-end gap-2">
@@ -212,15 +139,112 @@ function MenuItemCard({ item }) {
   )
 }
 
+function LoadingSkeleton() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      {[...Array(6)].map((_, i) => (
+        <div key={i} className="card p-4 animate-pulse">
+          <div className="flex justify-between">
+            <div className="space-y-2">
+              <div className="h-5 w-32 bg-gray-200 rounded" />
+              <div className="h-4 w-20 bg-gray-100 rounded" />
+            </div>
+            <div className="h-6 w-20 bg-gray-200 rounded-lg" />
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-4">
+            {[...Array(3)].map((_, j) => (
+              <div key={j}>
+                <div className="h-3 w-12 bg-gray-100 rounded mb-1" />
+                <div className="h-5 w-16 bg-gray-200 rounded" />
+              </div>
+            ))}
+          </div>
+          <div className="mt-4">
+            <div className="h-1.5 bg-gray-100 rounded-full" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function MenuManagement() {
   const [activeCategory, setActiveCategory] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [error, setError] = useState(null)
+  const [analysisData, setAnalysisData] = useState(null)
 
+  const fetchAnalysis = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await menuApi.analyze(null, null)
+      setAnalysisData(data)
+    } catch (err) {
+      setError(err.message || 'Errore nel caricamento dell\'analisi')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const runNewAnalysis = async () => {
+    setAnalyzing(true)
+    try {
+      const data = await menuApi.analyze(null, null)
+      setAnalysisData(data)
+    } catch (err) {
+      setError(err.message || 'Errore nell\'analisi')
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchAnalysis()
+  }, [])
+
+  // Get menu items from analysis
+  const menuItems = analysisData?.engineering_results || []
+  const recommendations = analysisData?.recommendations || []
+  const summary = analysisData?.summary || {}
+
+  // Build categories from data
+  const categoryCounts = menuItems.reduce((acc, item) => {
+    const cat = item.category?.toLowerCase() || 'altro'
+    acc[cat] = (acc[cat] || 0) + 1
+    return acc
+  }, {})
+
+  const categories = [
+    { id: 'all', name: 'Tutti', count: menuItems.length },
+    ...Object.entries(categoryCounts).map(([id, count]) => ({
+      id,
+      name: id.charAt(0).toUpperCase() + id.slice(1),
+      count,
+    })),
+  ]
+
+  // Classification counts
+  const classificationCounts = menuItems.reduce((acc, item) => {
+    const cls = item.classification?.toLowerCase() || 'dog'
+    acc[cls] = (acc[cls] || 0) + 1
+    return acc
+  }, { star: 0, plow_horse: 0, puzzle: 0, dog: 0 })
+
+  // Filter items
   const filteredItems = menuItems.filter(item => {
-    const matchesCategory = activeCategory === 'all' || item.category.toLowerCase() === activeCategory
-    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase())
+    const itemCategory = item.category?.toLowerCase() || ''
+    const matchesCategory = activeCategory === 'all' || itemCategory === activeCategory
+    const matchesSearch = item.name?.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesCategory && matchesSearch
   })
+
+  // Get high priority recommendations
+  const priorityRecommendations = recommendations
+    .filter(r => r.priority === 'high')
+    .slice(0, 3)
 
   return (
     <div className="space-y-6">
@@ -231,9 +255,13 @@ export default function MenuManagement() {
           <p className="section-subtitle">Analizza e ottimizza i piatti del tuo menù</p>
         </div>
         <div className="flex gap-3">
-          <button className="btn btn-secondary gap-2">
-            <ArrowPathIcon className="w-4 h-4" />
-            Aggiorna Analisi
+          <button
+            className="btn btn-secondary gap-2"
+            onClick={runNewAnalysis}
+            disabled={analyzing}
+          >
+            <ArrowPathIcon className={`w-4 h-4 ${analyzing ? 'animate-spin' : ''}`} />
+            {analyzing ? 'Analisi in corso...' : 'Aggiorna Analisi'}
           </button>
           <button className="btn btn-primary gap-2">
             <PlusIcon className="w-4 h-4" />
@@ -242,33 +270,50 @@ export default function MenuManagement() {
         </div>
       </div>
 
-      {/* AI Insights Banner */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="card p-4 bg-gradient-to-r from-primary-500 to-accent-500 text-white"
-      >
-        <div className="flex items-start gap-4">
-          <div className="p-2 bg-white/20 rounded-xl">
-            <SparklesIcon className="w-6 h-6" />
-          </div>
-          <div className="flex-1">
-            <h3 className="font-semibold">Suggerimenti AI</h3>
-            <p className="text-sm text-white/90 mt-1">
-              L'analisi AI ha identificato 3 piatti "Puzzle" con alto potenziale. Considera di promuoverli nel menù
-              per aumentare le vendite mantenendo alti margini.
-            </p>
-          </div>
-          <button className="btn bg-white text-primary-600 hover:bg-white/90 text-sm">
-            Vedi Raccomandazioni
-          </button>
+      {error && (
+        <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={fetchAnalysis} className="btn btn-secondary text-xs">Riprova</button>
         </div>
-      </motion.div>
+      )}
+
+      {/* AI Insights Banner */}
+      {priorityRecommendations.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="card p-4 bg-gradient-to-r from-primary-500 to-accent-500 text-white"
+        >
+          <div className="flex items-start gap-4">
+            <div className="p-2 bg-white/20 rounded-xl">
+              <SparklesIcon className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold">Suggerimenti AI</h3>
+              <p className="text-sm text-white/90 mt-1">
+                {priorityRecommendations.length} raccomandazioni ad alta priorità:
+                {' '}{priorityRecommendations.map(r => r.name).join(', ')}
+              </p>
+            </div>
+            <button className="btn bg-white text-primary-600 hover:bg-white/90 text-sm">
+              Vedi Raccomandazioni
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Analysis Period */}
+      {analysisData?.period && (
+        <div className="text-sm text-gray-500">
+          Periodo analisi: {analysisData.period.start_date || 'N/A'} - {analysisData.period.end_date || 'N/A'}
+          {' '}({analysisData.period.total_orders || 0} ordini, €{analysisData.period.total_revenue?.toFixed(2) || '0.00'} ricavi)
+        </div>
+      )}
 
       {/* Stats Summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {Object.entries(classificationConfig).map(([key, config]) => {
-          const count = menuItems.filter(i => i.classification === key).length
+          const count = classificationCounts[key] || 0
           const Icon = config.icon
           return (
             <div key={key} className={`card p-4 ${config.bgColor} border ${config.borderColor}`}>
@@ -332,15 +377,57 @@ export default function MenuManagement() {
       </div>
 
       {/* Menu Items Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filteredItems.map((item) => (
-          <MenuItemCard key={item.id} item={item} />
-        ))}
-      </div>
+      {loading ? (
+        <LoadingSkeleton />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filteredItems.map((item) => (
+            <MenuItemCard key={item.menu_item_id} item={item} />
+          ))}
+        </div>
+      )}
 
-      {filteredItems.length === 0 && (
+      {!loading && filteredItems.length === 0 && (
         <div className="card p-12 text-center">
-          <p className="text-gray-500">Nessun piatto trovato</p>
+          <p className="text-gray-500">
+            {menuItems.length === 0
+              ? 'Nessun dato disponibile. Esegui un\'analisi del menù per visualizzare i risultati.'
+              : 'Nessun piatto trovato con i filtri selezionati'}
+          </p>
+        </div>
+      )}
+
+      {/* Recommendations Section */}
+      {recommendations.length > 0 && (
+        <div className="card p-6">
+          <h3 className="font-semibold text-gray-900 mb-4">Raccomandazioni AI</h3>
+          <div className="space-y-3">
+            {recommendations.slice(0, 5).map((rec, i) => (
+              <div key={i} className="p-4 rounded-xl bg-gray-50 border border-gray-100">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="font-medium text-gray-900">{rec.name}</h4>
+                    <p className="text-sm text-gray-600 mt-1">{rec.description}</p>
+                  </div>
+                  <span className={`badge ${
+                    rec.priority === 'high' ? 'badge-error' :
+                    rec.priority === 'medium' ? 'badge-warning' : 'badge-secondary'
+                  }`}>
+                    {rec.priority === 'high' ? 'Alta' : rec.priority === 'medium' ? 'Media' : 'Bassa'}
+                  </span>
+                </div>
+                {rec.actions && rec.actions.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {rec.actions.map((action, j) => (
+                      <span key={j} className="text-xs px-2 py-1 bg-white rounded border border-gray-200 text-gray-600">
+                        {action}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

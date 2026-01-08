@@ -1,99 +1,21 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   PlusIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   CalendarDaysIcon,
-  ClockIcon,
   UsersIcon,
   PhoneIcon,
   CheckCircleIcon,
   XCircleIcon,
   ExclamationCircleIcon,
   MagnifyingGlassIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline'
-import { format, addDays, subDays, isSameDay, startOfWeek, addWeeks, subWeeks } from 'date-fns'
+import { format, addDays, isSameDay, startOfWeek, addWeeks, subWeeks } from 'date-fns'
 import { it } from 'date-fns/locale'
-
-const timeSlots = [
-  '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
-  '19:00', '19:30', '20:00', '20:30', '21:00', '21:30', '22:00'
-]
-
-const tables = [
-  { id: 1, number: '1', capacity: 2, status: 'available' },
-  { id: 2, number: '2', capacity: 4, status: 'reserved' },
-  { id: 3, number: '3', capacity: 4, status: 'occupied' },
-  { id: 4, number: '4', capacity: 6, status: 'available' },
-  { id: 5, number: '5', capacity: 2, status: 'reserved' },
-  { id: 6, number: '6', capacity: 8, status: 'available' },
-]
-
-const reservations = [
-  {
-    id: 1,
-    confirmationCode: 'RST12345',
-    customerName: 'Marco Bianchi',
-    customerPhone: '+39 333 1234567',
-    date: new Date(),
-    time: '12:30',
-    partySize: 4,
-    tableNumber: '2',
-    status: 'confirmed',
-    specialRequests: 'Tavolo vicino alla finestra',
-    source: 'whatsapp',
-  },
-  {
-    id: 2,
-    confirmationCode: 'RST12346',
-    customerName: 'Anna Verdi',
-    customerPhone: '+39 339 9876543',
-    date: new Date(),
-    time: '13:00',
-    partySize: 2,
-    tableNumber: '5',
-    status: 'confirmed',
-    source: 'website',
-  },
-  {
-    id: 3,
-    confirmationCode: 'RST12347',
-    customerName: 'Famiglia Rossi',
-    customerPhone: '+39 347 5555555',
-    date: new Date(),
-    time: '19:30',
-    partySize: 6,
-    tableNumber: null,
-    status: 'pending',
-    source: 'phone',
-  },
-  {
-    id: 4,
-    confirmationCode: 'RST12348',
-    customerName: 'Luigi Neri',
-    customerPhone: '+39 320 1111111',
-    date: new Date(),
-    time: '20:00',
-    partySize: 2,
-    status: 'confirmed',
-    tableNumber: '1',
-    source: 'whatsapp',
-  },
-  {
-    id: 5,
-    confirmationCode: 'RST12349',
-    customerName: 'Gruppo Azienda XY',
-    customerPhone: '+39 02 12345678',
-    date: new Date(),
-    time: '20:30',
-    partySize: 12,
-    status: 'confirmed',
-    tableNumber: '6',
-    occasion: 'Cena aziendale',
-    source: 'phone',
-  },
-]
+import { reservationsApi } from '../services/api'
 
 const statusConfig = {
   confirmed: {
@@ -123,6 +45,13 @@ const statusConfig = {
     bgColor: 'bg-blue-50',
     textColor: 'text-blue-700',
     borderColor: 'border-blue-200',
+  },
+  completed: {
+    label: 'Completata',
+    icon: CheckCircleIcon,
+    bgColor: 'bg-gray-50',
+    textColor: 'text-gray-700',
+    borderColor: 'border-gray-200',
   },
 }
 
@@ -180,9 +109,28 @@ function MiniCalendar({ selectedDate, onDateSelect }) {
   )
 }
 
-function ReservationCard({ reservation }) {
-  const status = statusConfig[reservation.status]
+function ReservationCard({ reservation, onConfirm, onCancel, onCheckIn }) {
+  const status = statusConfig[reservation.status] || statusConfig.pending
   const StatusIcon = status.icon
+  const [actionLoading, setActionLoading] = useState(null)
+
+  const handleConfirm = async () => {
+    setActionLoading('confirm')
+    await onConfirm(reservation.confirmation_code)
+    setActionLoading(null)
+  }
+
+  const handleCancel = async () => {
+    setActionLoading('cancel')
+    await onCancel(reservation.confirmation_code)
+    setActionLoading(null)
+  }
+
+  const handleCheckIn = async () => {
+    setActionLoading('checkin')
+    await onCheckIn(reservation.confirmation_code)
+    setActionLoading(null)
+  }
 
   return (
     <motion.div
@@ -196,14 +144,14 @@ function ReservationCard({ reservation }) {
             {reservation.time}
           </div>
           <div>
-            <h4 className="font-semibold text-gray-900">{reservation.customerName}</h4>
+            <h4 className="font-semibold text-gray-900">{reservation.customer_name}</h4>
             <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
               <span className="flex items-center gap-1">
                 <UsersIcon className="w-4 h-4" />
-                {reservation.partySize}
+                {reservation.party_size}
               </span>
-              {reservation.tableNumber && (
-                <span>Tavolo {reservation.tableNumber}</span>
+              {reservation.table && (
+                <span>Tavolo {reservation.table}</span>
               )}
             </div>
           </div>
@@ -214,32 +162,36 @@ function ReservationCard({ reservation }) {
         </span>
       </div>
 
-      {(reservation.specialRequests || reservation.occasion) && (
-        <div className="mt-3 p-2.5 rounded-lg bg-gray-50 text-sm text-gray-600">
-          {reservation.occasion && <p className="font-medium">{reservation.occasion}</p>}
-          {reservation.specialRequests && <p>{reservation.specialRequests}</p>}
-        </div>
-      )}
-
       <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <PhoneIcon className="w-4 h-4" />
-          {reservation.customerPhone}
+        <div className="text-xs text-gray-400">
+          {reservation.confirmation_code}
         </div>
         <div className="flex gap-2">
           {reservation.status === 'pending' && (
             <>
-              <button className="btn btn-secondary text-xs py-1.5 px-3">
-                Rifiuta
+              <button
+                className="btn btn-secondary text-xs py-1.5 px-3"
+                onClick={handleCancel}
+                disabled={actionLoading === 'cancel'}
+              >
+                {actionLoading === 'cancel' ? '...' : 'Rifiuta'}
               </button>
-              <button className="btn btn-primary text-xs py-1.5 px-3">
-                Conferma
+              <button
+                className="btn btn-primary text-xs py-1.5 px-3"
+                onClick={handleConfirm}
+                disabled={actionLoading === 'confirm'}
+              >
+                {actionLoading === 'confirm' ? '...' : 'Conferma'}
               </button>
             </>
           )}
           {reservation.status === 'confirmed' && (
-            <button className="btn btn-primary text-xs py-1.5 px-3">
-              Check-in
+            <button
+              className="btn btn-primary text-xs py-1.5 px-3"
+              onClick={handleCheckIn}
+              disabled={actionLoading === 'checkin'}
+            >
+              {actionLoading === 'checkin' ? '...' : 'Check-in'}
             </button>
           )}
         </div>
@@ -248,64 +200,155 @@ function ReservationCard({ reservation }) {
   )
 }
 
-function TableMap() {
+function CapacityCard({ capacity }) {
+  if (!capacity) return null
+
   return (
     <div className="card p-6">
-      <h3 className="font-semibold text-gray-900 mb-4">Mappa Tavoli</h3>
-      <div className="grid grid-cols-3 gap-4">
-        {tables.map((table) => {
-          const statusColors = {
-            available: 'bg-green-100 border-green-300 text-green-700',
-            reserved: 'bg-amber-100 border-amber-300 text-amber-700',
-            occupied: 'bg-red-100 border-red-300 text-red-700',
-          }
+      <h3 className="font-semibold text-gray-900 mb-4">Capacita Giornaliera</h3>
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-600">Tavoli Totali</span>
+          <span className="font-semibold">{capacity.total_tables}</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-600">Capacita Totale</span>
+          <span className="font-semibold">{capacity.total_capacity} posti</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-600">Prenotati</span>
+          <span className="font-semibold">{capacity.total_covers_reserved} coperti</span>
+        </div>
 
-          return (
-            <button
-              key={table.id}
-              className={`
-                p-4 rounded-xl border-2 text-center transition-all hover:shadow-md
-                ${statusColors[table.status]}
-              `}
-            >
-              <p className="text-lg font-bold">{table.number}</p>
-              <p className="text-xs mt-1">{table.capacity} posti</p>
-            </button>
-          )
-        })}
-      </div>
+        <div className="pt-4 border-t border-gray-100">
+          <div className="flex justify-between items-center text-sm mb-2">
+            <span className="text-gray-600">Disponibilita</span>
+            <span className="font-semibold text-primary-600">{Math.round(capacity.availability_percentage)}%</span>
+          </div>
+          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary-500 rounded-full"
+              style={{ width: `${100 - capacity.availability_percentage}%` }}
+            />
+          </div>
+        </div>
 
-      <div className="flex items-center justify-center gap-6 mt-6 pt-4 border-t border-gray-100">
-        <span className="flex items-center gap-2 text-sm text-gray-600">
-          <span className="w-3 h-3 rounded-full bg-green-400" />
-          Disponibile
-        </span>
-        <span className="flex items-center gap-2 text-sm text-gray-600">
-          <span className="w-3 h-3 rounded-full bg-amber-400" />
-          Prenotato
-        </span>
-        <span className="flex items-center gap-2 text-sm text-gray-600">
-          <span className="w-3 h-3 rounded-full bg-red-400" />
-          Occupato
-        </span>
+        {capacity.lunch && (
+          <div className="pt-4 border-t border-gray-100">
+            <p className="text-sm font-medium text-gray-700 mb-2">Pranzo</p>
+            <div className="text-sm text-gray-600">
+              {capacity.lunch.reservations} prenotazioni, {capacity.lunch.covers} coperti
+            </div>
+          </div>
+        )}
+
+        {capacity.dinner && (
+          <div className="pt-4 border-t border-gray-100">
+            <p className="text-sm font-medium text-gray-700 mb-2">Cena</p>
+            <div className="text-sm text-gray-600">
+              {capacity.dinner.reservations} prenotazioni, {capacity.dinner.covers} coperti
+            </div>
+          </div>
+        )}
       </div>
+    </div>
+  )
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-3">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="card p-4 animate-pulse">
+          <div className="flex items-start gap-3">
+            <div className="w-12 h-12 rounded-xl bg-gray-200" />
+            <div className="space-y-2 flex-1">
+              <div className="h-5 w-32 bg-gray-200 rounded" />
+              <div className="h-4 w-24 bg-gray-100 rounded" />
+            </div>
+            <div className="h-6 w-20 bg-gray-200 rounded-lg" />
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
 
 export default function Reservations() {
   const [selectedDate, setSelectedDate] = useState(new Date())
-  const [view, setView] = useState('list') // 'list' or 'timeline'
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [reservations, setReservations] = useState([])
+  const [capacity, setCapacity] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
 
-  const todayReservations = reservations.filter(r =>
-    isSameDay(r.date, selectedDate)
-  )
+  const dateStr = format(selectedDate, 'yyyy-MM-dd')
 
+  const fetchData = async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const [reservationsRes, capacityRes] = await Promise.allSettled([
+        reservationsApi.getByDate(dateStr),
+        reservationsApi.getDailyCapacity(dateStr),
+      ])
+
+      setReservations(reservationsRes.status === 'fulfilled' ? reservationsRes.value : [])
+      setCapacity(capacityRes.status === 'fulfilled' ? capacityRes.value : null)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchData()
+  }, [dateStr])
+
+  const handleConfirm = async (confirmationCode) => {
+    try {
+      await reservationsApi.confirm(confirmationCode)
+      fetchData()
+    } catch (err) {
+      console.error('Error confirming reservation:', err)
+    }
+  }
+
+  const handleCancel = async (confirmationCode) => {
+    try {
+      await reservationsApi.cancel(confirmationCode)
+      fetchData()
+    } catch (err) {
+      console.error('Error cancelling reservation:', err)
+    }
+  }
+
+  const handleCheckIn = async (confirmationCode) => {
+    try {
+      await reservationsApi.checkIn(confirmationCode)
+      fetchData()
+    } catch (err) {
+      console.error('Error checking in reservation:', err)
+    }
+  }
+
+  // Filter reservations
+  const filteredReservations = reservations.filter(r => {
+    const matchesSearch = r.customer_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          r.confirmation_code?.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesStatus = statusFilter === 'all' || r.status === statusFilter
+    return matchesSearch && matchesStatus
+  })
+
+  // Compute stats
   const stats = {
-    total: todayReservations.length,
-    confirmed: todayReservations.filter(r => r.status === 'confirmed').length,
-    pending: todayReservations.filter(r => r.status === 'pending').length,
-    totalCovers: todayReservations.reduce((sum, r) => sum + r.partySize, 0),
+    total: reservations.length,
+    confirmed: reservations.filter(r => r.status === 'confirmed').length,
+    pending: reservations.filter(r => r.status === 'pending').length,
+    totalCovers: reservations.reduce((sum, r) => sum + (r.party_size || 0), 0),
   }
 
   return (
@@ -318,17 +361,33 @@ export default function Reservations() {
             {format(selectedDate, "EEEE d MMMM yyyy", { locale: it })}
           </p>
         </div>
-        <button className="btn btn-primary gap-2">
-          <PlusIcon className="w-4 h-4" />
-          Nuova Prenotazione
-        </button>
+        <div className="flex gap-3">
+          <button
+            className="btn btn-secondary gap-2"
+            onClick={fetchData}
+            disabled={loading}
+          >
+            <ArrowPathIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Aggiorna
+          </button>
+          <button className="btn btn-primary gap-2">
+            <PlusIcon className="w-4 h-4" />
+            Nuova Prenotazione
+          </button>
+        </div>
       </div>
+
+      {error && (
+        <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
+          Errore: {error}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column */}
         <div className="space-y-6">
           <MiniCalendar selectedDate={selectedDate} onDateSelect={setSelectedDate} />
-          <TableMap />
+          <CapacityCard capacity={capacity} />
         </div>
 
         {/* Right Column - Reservations */}
@@ -361,30 +420,51 @@ export default function Reservations() {
                 <input
                   type="text"
                   placeholder="Cerca prenotazione..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   className="input pl-10"
                 />
               </div>
-              <select className="input w-40">
+              <select
+                className="input w-40"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
                 <option value="all">Tutte</option>
                 <option value="confirmed">Confermate</option>
                 <option value="pending">In attesa</option>
+                <option value="seated">Al tavolo</option>
               </select>
             </div>
           </div>
 
           {/* Reservation List */}
-          <div className="space-y-3">
-            {todayReservations.length === 0 ? (
-              <div className="card p-12 text-center">
-                <CalendarDaysIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">Nessuna prenotazione per questa data</p>
-              </div>
-            ) : (
-              todayReservations.map((reservation) => (
-                <ReservationCard key={reservation.id} reservation={reservation} />
-              ))
-            )}
-          </div>
+          {loading ? (
+            <LoadingSkeleton />
+          ) : (
+            <div className="space-y-3">
+              {filteredReservations.length === 0 ? (
+                <div className="card p-12 text-center">
+                  <CalendarDaysIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500">
+                    {reservations.length === 0
+                      ? 'Nessuna prenotazione per questa data'
+                      : 'Nessuna prenotazione corrisponde ai filtri'}
+                  </p>
+                </div>
+              ) : (
+                filteredReservations.map((reservation) => (
+                  <ReservationCard
+                    key={reservation.confirmation_code}
+                    reservation={reservation}
+                    onConfirm={handleConfirm}
+                    onCancel={handleCancel}
+                    onCheckIn={handleCheckIn}
+                  />
+                ))
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
