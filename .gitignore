@@ -96,3 +96,7 @@ data/processed/
 models/trained/
 *.pkl
 *.joblib
+
+# Node.js
+node_modules/
+frontend/dist/
