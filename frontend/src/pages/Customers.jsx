@@ -10,8 +10,12 @@ import {
   ExclamationTriangleIcon,
   UserIcon,
   CurrencyEuroIcon,
+  CheckIcon,
+  PhoneIcon,
+  EnvelopeIcon,
 } from '@heroicons/react/24/outline'
 import { customersApi } from '../services/api'
+import Modal from '../components/Modal'
 
 const segmentConfig = {
   vip: {
@@ -143,6 +147,15 @@ function LoadingSkeleton() {
   )
 }
 
+const initialFormData = {
+  first_name: '',
+  last_name: '',
+  phone: '',
+  email: '',
+  whatsapp_number: '',
+  marketing_consent: false,
+}
+
 export default function Customers() {
   const [activeSegment, setActiveSegment] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -151,6 +164,13 @@ export default function Customers() {
   const [error, setError] = useState(null)
   const [customers, setCustomers] = useState([])
   const [segmentsSummary, setSegmentsSummary] = useState([])
+
+  // Modal state
+  const [showModal, setShowModal] = useState(false)
+  const [formData, setFormData] = useState(initialFormData)
+  const [formError, setFormError] = useState('')
+  const [formLoading, setFormLoading] = useState(false)
+  const [formSuccess, setFormSuccess] = useState(false)
 
   const fetchData = async () => {
     setLoading(true)
@@ -186,6 +206,66 @@ export default function Customers() {
   useEffect(() => {
     fetchData()
   }, [])
+
+  const handleOpenModal = () => {
+    setFormData(initialFormData)
+    setFormError('')
+    setFormSuccess(false)
+    setShowModal(true)
+  }
+
+  const handleCloseModal = () => {
+    setShowModal(false)
+    setFormData(initialFormData)
+    setFormError('')
+    setFormSuccess(false)
+  }
+
+  const handleFormChange = (e) => {
+    const { name, value, type, checked } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }))
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setFormError('')
+    setFormLoading(true)
+
+    // Validation
+    if (!formData.first_name.trim()) {
+      setFormError('Il nome è obbligatorio')
+      setFormLoading(false)
+      return
+    }
+    if (!formData.phone.trim()) {
+      setFormError('Il numero di telefono è obbligatorio')
+      setFormLoading(false)
+      return
+    }
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      setFormError('Inserisci un\'email valida')
+      setFormLoading(false)
+      return
+    }
+
+    try {
+      await customersApi.createCustomer(formData)
+      setFormSuccess(true)
+
+      // Refresh data after adding
+      setTimeout(() => {
+        handleCloseModal()
+        fetchData()
+      }, 1500)
+    } catch (err) {
+      setFormError(err.message || 'Errore nella creazione del cliente')
+    } finally {
+      setFormLoading(false)
+    }
+  }
 
   // Build segments from API data
   const segments = [
@@ -229,7 +309,7 @@ export default function Customers() {
             <ArrowPathIcon className={`w-4 h-4 ${segmenting ? 'animate-spin' : ''}`} />
             {segmenting ? 'Segmentazione...' : 'Aggiorna Segmenti'}
           </button>
-          <button className="btn btn-primary gap-2">
+          <button className="btn btn-primary gap-2" onClick={handleOpenModal}>
             <UserPlusIcon className="w-4 h-4" />
             Nuovo Cliente
           </button>
@@ -391,6 +471,132 @@ export default function Customers() {
           </p>
         </div>
       )}
+
+      {/* Create Customer Modal */}
+      <Modal isOpen={showModal} onClose={handleCloseModal} title="Nuovo Cliente" size="md">
+        {formSuccess ? (
+          <div className="text-center py-8">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckIcon className="w-8 h-8 text-green-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900">Cliente aggiunto!</h3>
+            <p className="text-gray-500 mt-2">Il cliente è stato inserito nel database</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {formError && (
+              <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                {formError}
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
+                <input
+                  type="text"
+                  name="first_name"
+                  value={formData.first_name}
+                  onChange={handleFormChange}
+                  className="input"
+                  placeholder="Mario"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cognome</label>
+                <input
+                  type="text"
+                  name="last_name"
+                  value={formData.last_name}
+                  onChange={handleFormChange}
+                  className="input"
+                  placeholder="Rossi"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Telefono *</label>
+              <div className="relative">
+                <PhoneIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="tel"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleFormChange}
+                  className="input pl-10"
+                  placeholder="+39 333 1234567"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <div className="relative">
+                <EnvelopeIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleFormChange}
+                  className="input pl-10"
+                  placeholder="mario@email.it"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp</label>
+              <input
+                type="tel"
+                name="whatsapp_number"
+                value={formData.whatsapp_number}
+                onChange={handleFormChange}
+                className="input"
+                placeholder="+39 333 1234567"
+              />
+            </div>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                name="marketing_consent"
+                checked={formData.marketing_consent}
+                onChange={handleFormChange}
+                className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              />
+              <span className="text-sm text-gray-700">Consenso per comunicazioni marketing</span>
+            </label>
+
+            <div className="flex gap-3 pt-4 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                className="btn btn-secondary flex-1"
+              >
+                Annulla
+              </button>
+              <button
+                type="submit"
+                disabled={formLoading}
+                className="btn btn-primary flex-1 gap-2"
+              >
+                {formLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Salvataggio...
+                  </>
+                ) : (
+                  <>
+                    <UserPlusIcon className="w-4 h-4" />
+                    Aggiungi Cliente
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   )
 }

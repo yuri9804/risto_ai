@@ -107,6 +107,26 @@ export const menuApi = {
     if (menuItemId) params.append('menu_item_id', menuItemId)
     return request(`/menu/engineering/history?${params}`)
   },
+
+  list: (categoryId, activeOnly = true) => {
+    const params = new URLSearchParams({ active_only: activeOnly })
+    if (categoryId) params.append('category_id', categoryId)
+    return request(`/menu/items?${params}`)
+  },
+
+  create: (data) =>
+    request('/menu/items', {
+      method: 'POST',
+      body: data,
+    }),
+
+  getCategories: () =>
+    request('/menu/categories'),
+
+  createCategory: (name, description) =>
+    request(`/menu/categories?name=${encodeURIComponent(name)}${description ? `&description=${encodeURIComponent(description)}` : ''}`, {
+      method: 'POST',
+    }),
 }
 
 // Customers API
