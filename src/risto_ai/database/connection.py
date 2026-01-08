@@ -78,6 +78,6 @@ def get_sync_session() -> Generator[Session, None, None]:
 
 
 async def init_db() -> None:
-    """Initialize database tables."""
+    """Initialize database tables if they don't exist."""
     async with async_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(lambda sync_conn: Base.metadata.create_all(sync_conn, checkfirst=True))
