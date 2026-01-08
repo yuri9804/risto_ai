@@ -13,12 +13,19 @@ class ApiError extends Error {
   }
 }
 
+// Get auth token from localStorage
+function getAuthToken() {
+  return localStorage.getItem('auth_token')
+}
+
 async function request(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`
 
+  const token = getAuthToken()
   const config = {
     headers: {
       'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
       ...options.headers,
     },
     ...options,
@@ -33,6 +40,15 @@ async function request(endpoint, options = {}) {
     const data = await response.json().catch(() => null)
 
     if (!response.ok) {
+      // Handle 401 unauthorized - clear token and redirect
+      if (response.status === 401) {
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('auth_user')
+        // Only redirect if not already on auth pages
+        if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/register')) {
+          window.location.href = '/login'
+        }
+      }
       throw new ApiError(
         data?.detail || `HTTP error ${response.status}`,
         response.status,
@@ -47,6 +63,32 @@ async function request(endpoint, options = {}) {
     }
     throw new ApiError(error.message, 0, null)
   }
+}
+
+// Auth API
+export const authApi = {
+  register: (data) =>
+    request('/auth/register', {
+      method: 'POST',
+      body: data,
+    }),
+
+  login: (email, password) =>
+    request('/auth/login', {
+      method: 'POST',
+      body: { email, password },
+    }),
+
+  logout: () =>
+    request('/auth/logout', { method: 'POST' }),
+
+  getProfile: () =>
+    request('/auth/me'),
+
+  updateProfile: (nome_ristorante) =>
+    request(`/auth/me?nome_ristorante=${encodeURIComponent(nome_ristorante)}`, {
+      method: 'PUT',
+    }),
 }
 
 // Menu API
@@ -298,6 +340,7 @@ export const dashboardApi = {
 
 export { ApiError }
 export default {
+  auth: authApi,
   menu: menuApi,
   customers: customersApi,
   reservations: reservationsApi,

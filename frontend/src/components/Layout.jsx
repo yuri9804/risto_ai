@@ -15,6 +15,7 @@ import {
   ArrowRightOnRectangleIcon,
   SparklesIcon,
 } from '@heroicons/react/24/outline'
+import { useAuth } from '../contexts/AuthContext'
 
 const navigation = [
   { name: 'Dashboard', href: '/app', icon: HomeIcon },
@@ -30,8 +31,31 @@ const bottomNav = [
   { name: 'Impostazioni', href: '/app/settings', icon: Cog6ToothIcon },
 ]
 
+const planLabels = {
+  free: 'Piano Free',
+  pro: 'Piano Pro',
+  enterprise: 'Enterprise',
+}
+
+const planColors = {
+  free: 'bg-gray-100 text-gray-600',
+  pro: 'bg-primary-100 text-primary-700',
+  enterprise: 'bg-accent-100 text-accent-700',
+}
+
 function Sidebar({ mobile, onClose }) {
   const location = useLocation()
+  const { user, logout } = useAuth()
+
+  // Get user initials
+  const getInitials = () => {
+    if (!user?.nome_ristorante) return 'RI'
+    const words = user.nome_ristorante.split(' ')
+    if (words.length >= 2) {
+      return (words[0][0] + words[1][0]).toUpperCase()
+    }
+    return user.nome_ristorante.substring(0, 2).toUpperCase()
+  }
 
   return (
     <div className="flex h-full flex-col bg-white border-r border-gray-200">
@@ -110,13 +134,21 @@ function Sidebar({ mobile, onClose }) {
         {/* User profile */}
         <div className="flex items-center gap-3 px-3 py-3 mt-4 rounded-xl bg-gray-50">
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-400 to-accent-400 flex items-center justify-center text-white font-semibold text-sm">
-            MR
+            {getInitials()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">Mario Rossi</p>
-            <p className="text-xs text-gray-500 truncate">Ristorante Da Mario</p>
+            <p className="text-sm font-medium text-gray-900 truncate">
+              {user?.nome_ristorante || 'Ristorante'}
+            </p>
+            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${planColors[user?.piano] || planColors.free}`}>
+              {planLabels[user?.piano] || planLabels.free}
+            </span>
           </div>
-          <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-lg transition-colors">
+          <button
+            onClick={logout}
+            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            title="Logout"
+          >
             <ArrowRightOnRectangleIcon className="w-4 h-4" />
           </button>
         </div>

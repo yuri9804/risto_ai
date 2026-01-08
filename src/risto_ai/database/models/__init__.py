@@ -3,6 +3,10 @@ Database models for Risto AI.
 All SQLAlchemy models for the restaurant management system.
 """
 
+from risto_ai.database.models.user import (
+    User,
+    SubscriptionPlan,
+)
 from risto_ai.database.models.menu import (
     MenuItem,
     Ingredient,
@@ -46,6 +50,9 @@ from risto_ai.database.models.staff import (
 )
 
 __all__ = [
+    # User
+    "User",
+    "SubscriptionPlan",
     # Menu
     "MenuItem",
     "Ingredient",

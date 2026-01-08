@@ -3,6 +3,7 @@ API Routes for Risto AI.
 """
 
 from risto_ai.api.routes import (
+    auth,
     menu,
     customers,
     reservations,
@@ -13,6 +14,7 @@ from risto_ai.api.routes import (
 )
 
 __all__ = [
+    "auth",
     "menu",
     "customers",
     "reservations",

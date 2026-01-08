@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from risto_ai.config import get_settings
 from risto_ai.database import init_db
 from risto_ai.api.routes import (
+    auth,
     menu,
     customers,
     reservations,
@@ -66,6 +67,7 @@ def create_app() -> FastAPI:
     )
 
     # Include routers
+    app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
     app.include_router(menu.router, prefix="/api/v1/menu", tags=["Menu"])
     app.include_router(customers.router, prefix="/api/v1/customers", tags=["Customers"])
     app.include_router(reservations.router, prefix="/api/v1/reservations", tags=["Reservations"])

@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     api_debug: bool = False
     secret_key: str = "change-me-in-production"
 
+    # JWT Authentication
+    jwt_secret_key: str = "your-super-secret-jwt-key-change-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
+
     # External APIs
     openweather_api_key: Optional[str] = None
     google_calendar_api_key: Optional[str] = None

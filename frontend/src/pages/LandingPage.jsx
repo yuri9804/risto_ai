@@ -68,9 +68,10 @@ const testimonials = [
 
 const pricingPlans = [
   {
-    name: 'Starter',
-    price: 49,
-    description: 'Perfetto per iniziare',
+    id: 'free',
+    name: 'Free',
+    price: 0,
+    description: 'Per iniziare gratis',
     features: [
       '1 ristorante',
       'Previsioni AI base',
@@ -80,7 +81,8 @@ const pricingPlans = [
     ],
   },
   {
-    name: 'Professional',
+    id: 'pro',
+    name: 'Pro',
     price: 99,
     description: 'Per ristoranti in crescita',
     features: [
@@ -95,6 +97,7 @@ const pricingPlans = [
     popular: true,
   },
   {
+    id: 'enterprise',
     name: 'Enterprise',
     price: 199,
     description: 'Per catene e gruppi',
@@ -128,10 +131,10 @@ function Navbar() {
             <a href="#pricing" className="text-gray-600 hover:text-gray-900 text-sm font-medium">Prezzi</a>
           </div>
           <div className="flex items-center gap-4">
-            <Link to="/app" className="text-gray-600 hover:text-gray-900 text-sm font-medium">
+            <Link to="/login" className="text-gray-600 hover:text-gray-900 text-sm font-medium">
               Accedi
             </Link>
-            <Link to="/app" className="btn btn-primary text-sm">
+            <Link to="/register" className="btn btn-primary text-sm">
               Prova Gratuita
             </Link>
           </div>
@@ -186,7 +189,7 @@ function Hero() {
             transition={{ duration: 0.5, delay: 0.3 }}
             className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <Link to="/app" className="btn btn-primary px-8 py-3 text-base gap-2">
+            <Link to="/register?piano=free" className="btn btn-primary px-8 py-3 text-base gap-2">
               Inizia Gratis
               <ArrowRightIcon className="w-4 h-4" />
             </Link>
@@ -399,10 +402,10 @@ function Pricing() {
                 ))}
               </ul>
               <Link
-                to="/app"
+                to={`/register?piano=${plan.id}`}
                 className={`mt-8 w-full btn ${plan.popular ? 'btn-primary' : 'btn-secondary'} justify-center`}
               >
-                Inizia Ora
+                {plan.price === 0 ? 'Inizia Gratis' : 'Inizia Ora'}
               </Link>
             </motion.div>
           ))}
@@ -429,7 +432,7 @@ function CTA() {
             Inizia oggi la tua prova gratuita di 14 giorni. Nessuna carta di credito richiesta.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link to="/app" className="btn bg-white text-primary-600 hover:bg-white/90 px-8 py-3 text-base gap-2">
+            <Link to="/register?piano=free" className="btn bg-white text-primary-600 hover:bg-white/90 px-8 py-3 text-base gap-2">
               Inizia la Prova Gratuita
               <ArrowRightIcon className="w-4 h-4" />
             </Link>
