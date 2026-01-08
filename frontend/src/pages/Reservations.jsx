@@ -16,6 +16,7 @@ import {
 import { format, addDays, isSameDay, startOfWeek, addWeeks, subWeeks } from 'date-fns'
 import { it } from 'date-fns/locale'
 import { reservationsApi } from '../services/api'
+import Modal from '../components/Modal'
 
 const statusConfig = {
   confirmed: {
@@ -283,6 +284,21 @@ export default function Reservations() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
 
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [formData, setFormData] = useState({
+    customer_name: '',
+    customer_phone: '',
+    customer_email: '',
+    party_size: 2,
+    date: format(new Date(), 'yyyy-MM-dd'),
+    time: '19:00',
+    notes: '',
+  })
+  const [formLoading, setFormLoading] = useState(false)
+  const [formError, setFormError] = useState(null)
+  const [availability, setAvailability] = useState(null)
+
   const dateStr = format(selectedDate, 'yyyy-MM-dd')
 
   const fetchData = async () => {
@@ -343,6 +359,92 @@ export default function Reservations() {
     return matchesSearch && matchesStatus
   })
 
+  // Modal handlers
+  const openModal = () => {
+    setFormData({
+      customer_name: '',
+      customer_phone: '',
+      customer_email: '',
+      party_size: 2,
+      date: format(selectedDate, 'yyyy-MM-dd'),
+      time: '19:00',
+      notes: '',
+    })
+    setFormError(null)
+    setAvailability(null)
+    setIsModalOpen(true)
+  }
+
+  const closeModal = () => {
+    setIsModalOpen(false)
+    setFormError(null)
+    setAvailability(null)
+  }
+
+  const handleInputChange = (e) => {
+    const { name, value, type } = e.target
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === 'number' ? parseInt(value, 10) || 0 : value,
+    }))
+  }
+
+  const checkAvailability = async () => {
+    try {
+      const result = await reservationsApi.checkAvailability(
+        formData.date,
+        formData.party_size,
+        formData.time
+      )
+      setAvailability(result)
+    } catch (err) {
+      setFormError(err.message || 'Errore nel controllo disponibilità')
+    }
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setFormLoading(true)
+    setFormError(null)
+
+    // Validation
+    if (!formData.customer_name.trim()) {
+      setFormError('Il nome cliente è obbligatorio')
+      setFormLoading(false)
+      return
+    }
+    if (!formData.customer_phone.trim()) {
+      setFormError('Il telefono è obbligatorio')
+      setFormLoading(false)
+      return
+    }
+    if (formData.party_size < 1) {
+      setFormError('Il numero di persone deve essere almeno 1')
+      setFormLoading(false)
+      return
+    }
+
+    try {
+      await reservationsApi.create({
+        customer_name: formData.customer_name,
+        customer_phone: formData.customer_phone,
+        customer_email: formData.customer_email || null,
+        party_size: formData.party_size,
+        reservation_date: formData.date,
+        reservation_time: formData.time,
+        notes: formData.notes || null,
+      })
+      closeModal()
+      // Update selected date to match the reservation
+      setSelectedDate(new Date(formData.date))
+      fetchData()
+    } catch (err) {
+      setFormError(err.message || 'Errore nella creazione della prenotazione')
+    } finally {
+      setFormLoading(false)
+    }
+  }
+
   // Compute stats
   const stats = {
     total: reservations.length,
@@ -370,7 +472,7 @@ export default function Reservations() {
             <ArrowPathIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Aggiorna
           </button>
-          <button className="btn btn-primary gap-2">
+          <button className="btn btn-primary gap-2" onClick={openModal}>
             <PlusIcon className="w-4 h-4" />
             Nuova Prenotazione
           </button>
@@ -467,6 +569,177 @@ export default function Reservations() {
           )}
         </div>
       </div>
+
+      {/* Create Reservation Modal */}
+      <Modal isOpen={isModalOpen} onClose={closeModal} title="Nuova Prenotazione" size="lg">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {formError && (
+            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+              {formError}
+            </div>
+          )}
+
+          {/* Customer Info */}
+          <div className="space-y-4">
+            <h3 className="font-medium text-gray-900">Dati Cliente</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nome Cliente *
+                </label>
+                <input
+                  type="text"
+                  name="customer_name"
+                  value={formData.customer_name}
+                  onChange={handleInputChange}
+                  className="input"
+                  placeholder="Mario Rossi"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Telefono *
+                </label>
+                <input
+                  type="tel"
+                  name="customer_phone"
+                  value={formData.customer_phone}
+                  onChange={handleInputChange}
+                  className="input"
+                  placeholder="+39 333 1234567"
+                  required
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email
+              </label>
+              <input
+                type="email"
+                name="customer_email"
+                value={formData.customer_email}
+                onChange={handleInputChange}
+                className="input"
+                placeholder="mario.rossi@email.com"
+              />
+            </div>
+          </div>
+
+          {/* Reservation Details */}
+          <div className="space-y-4">
+            <h3 className="font-medium text-gray-900">Dettagli Prenotazione</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Data *
+                </label>
+                <input
+                  type="date"
+                  name="date"
+                  value={formData.date}
+                  onChange={handleInputChange}
+                  className="input"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Ora *
+                </label>
+                <select
+                  name="time"
+                  value={formData.time}
+                  onChange={handleInputChange}
+                  className="input"
+                  required
+                >
+                  <option value="12:00">12:00</option>
+                  <option value="12:30">12:30</option>
+                  <option value="13:00">13:00</option>
+                  <option value="13:30">13:30</option>
+                  <option value="14:00">14:00</option>
+                  <option value="19:00">19:00</option>
+                  <option value="19:30">19:30</option>
+                  <option value="20:00">20:00</option>
+                  <option value="20:30">20:30</option>
+                  <option value="21:00">21:00</option>
+                  <option value="21:30">21:30</option>
+                  <option value="22:00">22:00</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Numero Persone *
+                </label>
+                <input
+                  type="number"
+                  name="party_size"
+                  value={formData.party_size}
+                  onChange={handleInputChange}
+                  className="input"
+                  min="1"
+                  max="20"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Availability Check */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={checkAvailability}
+                className="btn btn-secondary text-sm"
+              >
+                Verifica Disponibilità
+              </button>
+              {availability && (
+                <span className={`text-sm ${availability.available ? 'text-green-600' : 'text-red-600'}`}>
+                  {availability.available
+                    ? `Disponibile - ${availability.available_slots?.length || 0} slot`
+                    : 'Non disponibile in questo orario'}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Note
+            </label>
+            <textarea
+              name="notes"
+              value={formData.notes}
+              onChange={handleInputChange}
+              className="input"
+              rows={3}
+              placeholder="Allergie, richieste particolari, occasione speciale..."
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={closeModal}
+              className="btn btn-secondary"
+              disabled={formLoading}
+            >
+              Annulla
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={formLoading}
+            >
+              {formLoading ? 'Creazione...' : 'Crea Prenotazione'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }

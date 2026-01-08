@@ -12,8 +12,10 @@ import {
   PencilSquareIcon,
   TrashIcon,
   EyeIcon,
+  CheckIcon,
 } from '@heroicons/react/24/outline'
 import { menuApi } from '../services/api'
+import Modal from '../components/Modal'
 
 const classificationConfig = {
   star: {
@@ -168,6 +170,18 @@ function LoadingSkeleton() {
   )
 }
 
+const initialFormData = {
+  name: '',
+  description: '',
+  category_id: '',
+  price: '',
+  cost: '',
+  preparation_time_minutes: 15,
+  is_vegetarian: false,
+  is_vegan: false,
+  is_gluten_free: false,
+}
+
 export default function MenuManagement() {
   const [activeCategory, setActiveCategory] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -175,6 +189,14 @@ export default function MenuManagement() {
   const [analyzing, setAnalyzing] = useState(false)
   const [error, setError] = useState(null)
   const [analysisData, setAnalysisData] = useState(null)
+
+  // Modal state
+  const [showModal, setShowModal] = useState(false)
+  const [formData, setFormData] = useState(initialFormData)
+  const [formError, setFormError] = useState('')
+  const [formLoading, setFormLoading] = useState(false)
+  const [formSuccess, setFormSuccess] = useState(false)
+  const [dbCategories, setDbCategories] = useState([])
 
   const fetchAnalysis = async () => {
     setLoading(true)
@@ -186,6 +208,15 @@ export default function MenuManagement() {
       setError(err.message || 'Errore nel caricamento dell\'analisi')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchCategories = async () => {
+    try {
+      const cats = await menuApi.getCategories()
+      setDbCategories(cats)
+    } catch (err) {
+      console.error('Errore caricamento categorie:', err)
     }
   }
 
@@ -203,12 +234,85 @@ export default function MenuManagement() {
 
   useEffect(() => {
     fetchAnalysis()
+    fetchCategories()
   }, [])
+
+  const handleOpenModal = () => {
+    setFormData(initialFormData)
+    setFormError('')
+    setFormSuccess(false)
+    setShowModal(true)
+  }
+
+  const handleCloseModal = () => {
+    setShowModal(false)
+    setFormData(initialFormData)
+    setFormError('')
+    setFormSuccess(false)
+  }
+
+  const handleFormChange = (e) => {
+    const { name, value, type, checked } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }))
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setFormError('')
+    setFormLoading(true)
+
+    // Validation
+    if (!formData.name.trim()) {
+      setFormError('Il nome del piatto è obbligatorio')
+      setFormLoading(false)
+      return
+    }
+    if (!formData.category_id) {
+      setFormError('Seleziona una categoria')
+      setFormLoading(false)
+      return
+    }
+    if (!formData.price || parseFloat(formData.price) <= 0) {
+      setFormError('Inserisci un prezzo valido')
+      setFormLoading(false)
+      return
+    }
+    if (!formData.cost || parseFloat(formData.cost) < 0) {
+      setFormError('Inserisci un costo valido')
+      setFormLoading(false)
+      return
+    }
+
+    try {
+      const payload = {
+        ...formData,
+        category_id: parseInt(formData.category_id),
+        price: parseFloat(formData.price),
+        cost: parseFloat(formData.cost),
+        preparation_time_minutes: parseInt(formData.preparation_time_minutes) || 15,
+      }
+
+      await menuApi.create(payload)
+      setFormSuccess(true)
+
+      // Refresh analysis after adding
+      setTimeout(() => {
+        handleCloseModal()
+        fetchAnalysis()
+      }, 1500)
+    } catch (err) {
+      setFormError(err.message || 'Errore nella creazione del piatto')
+    } finally {
+      setFormLoading(false)
+    }
+  }
 
   // Get menu items from analysis
   const menuItems = analysisData?.engineering_results || []
   const recommendations = analysisData?.recommendations || []
-  const summary = analysisData?.summary || {}
 
   // Build categories from data
   const categoryCounts = menuItems.reduce((acc, item) => {
@@ -263,7 +367,7 @@ export default function MenuManagement() {
             <ArrowPathIcon className={`w-4 h-4 ${analyzing ? 'animate-spin' : ''}`} />
             {analyzing ? 'Analisi in corso...' : 'Aggiorna Analisi'}
           </button>
-          <button className="btn btn-primary gap-2">
+          <button className="btn btn-primary gap-2" onClick={handleOpenModal}>
             <PlusIcon className="w-4 h-4" />
             Nuovo Piatto
           </button>
@@ -430,6 +534,167 @@ export default function MenuManagement() {
           </div>
         </div>
       )}
+
+      {/* Create Dish Modal */}
+      <Modal isOpen={showModal} onClose={handleCloseModal} title="Nuovo Piatto" size="md">
+        {formSuccess ? (
+          <div className="text-center py-8">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckIcon className="w-8 h-8 text-green-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900">Piatto creato!</h3>
+            <p className="text-gray-500 mt-2">Il piatto è stato aggiunto al menù</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {formError && (
+              <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                {formError}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nome piatto *</label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleFormChange}
+                className="input"
+                placeholder="es. Spaghetti alla Carbonara"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Descrizione</label>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleFormChange}
+                className="input"
+                rows={2}
+                placeholder="Descrizione del piatto..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Categoria *</label>
+              <select
+                name="category_id"
+                value={formData.category_id}
+                onChange={handleFormChange}
+                className="input"
+              >
+                <option value="">Seleziona categoria</option>
+                {dbCategories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Prezzo (€) *</label>
+                <input
+                  type="number"
+                  name="price"
+                  value={formData.price}
+                  onChange={handleFormChange}
+                  className="input"
+                  step="0.01"
+                  min="0"
+                  placeholder="12.00"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Costo (€) *</label>
+                <input
+                  type="number"
+                  name="cost"
+                  value={formData.cost}
+                  onChange={handleFormChange}
+                  className="input"
+                  step="0.01"
+                  min="0"
+                  placeholder="4.50"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tempo preparazione (min)</label>
+              <input
+                type="number"
+                name="preparation_time_minutes"
+                value={formData.preparation_time_minutes}
+                onChange={handleFormChange}
+                className="input"
+                min="1"
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="is_vegetarian"
+                  checked={formData.is_vegetarian}
+                  onChange={handleFormChange}
+                  className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700">Vegetariano</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="is_vegan"
+                  checked={formData.is_vegan}
+                  onChange={handleFormChange}
+                  className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700">Vegano</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="is_gluten_free"
+                  checked={formData.is_gluten_free}
+                  onChange={handleFormChange}
+                  className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700">Senza Glutine</span>
+              </label>
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                className="btn btn-secondary flex-1"
+              >
+                Annulla
+              </button>
+              <button
+                type="submit"
+                disabled={formLoading}
+                className="btn btn-primary flex-1 gap-2"
+              >
+                {formLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Creazione...
+                  </>
+                ) : (
+                  <>
+                    <PlusIcon className="w-4 h-4" />
+                    Crea Piatto
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   )
 }

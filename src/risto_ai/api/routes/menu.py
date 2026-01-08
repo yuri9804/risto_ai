@@ -172,3 +172,133 @@ def get_engineering_history(
         }
         for eng, name in results
     ]
+
+
+@router.post("/items")
+def create_menu_item(
+    data: MenuItemCreate,
+    session: Session = Depends(get_sync_session),
+):
+    """
+    Create a new menu item.
+    """
+    from risto_ai.database.models.menu import MenuItem, MenuCategory
+
+    # Check if category exists
+    category = session.get(MenuCategory, data.category_id)
+    if not category:
+        raise HTTPException(status_code=404, detail="Categoria non trovata")
+
+    # Create the menu item
+    menu_item = MenuItem(
+        name=data.name,
+        description=data.description,
+        category_id=data.category_id,
+        price=data.price,
+        cost=data.cost,
+        preparation_time_minutes=data.preparation_time_minutes,
+        is_vegetarian=data.is_vegetarian,
+        is_vegan=data.is_vegan,
+        is_gluten_free=data.is_gluten_free,
+    )
+
+    session.add(menu_item)
+    session.flush()
+
+    return {
+        "id": menu_item.id,
+        "name": menu_item.name,
+        "category": category.name,
+        "price": float(menu_item.price),
+        "cost": float(menu_item.cost),
+        "margin_percentage": menu_item.margin_percentage,
+        "message": "Piatto creato con successo"
+    }
+
+
+@router.get("/items")
+def list_menu_items(
+    category_id: Optional[int] = None,
+    active_only: bool = True,
+    session: Session = Depends(get_sync_session),
+):
+    """
+    List all menu items.
+    """
+    from sqlalchemy import select
+    from risto_ai.database.models.menu import MenuItem, MenuCategory
+
+    query = select(MenuItem, MenuCategory.name.label("category_name")).join(
+        MenuCategory, MenuItem.category_id == MenuCategory.id
+    )
+
+    if category_id:
+        query = query.where(MenuItem.category_id == category_id)
+    if active_only:
+        query = query.where(MenuItem.is_active == True)
+
+    query = query.order_by(MenuItem.category_id, MenuItem.name)
+    results = session.execute(query).fetchall()
+
+    return [
+        {
+            "id": item.id,
+            "name": item.name,
+            "description": item.description,
+            "category_id": item.category_id,
+            "category": category_name,
+            "price": float(item.price),
+            "cost": float(item.cost),
+            "margin_percentage": item.margin_percentage,
+            "is_vegetarian": item.is_vegetarian,
+            "is_vegan": item.is_vegan,
+            "is_gluten_free": item.is_gluten_free,
+            "is_active": item.is_active,
+        }
+        for item, category_name in results
+    ]
+
+
+@router.get("/categories")
+def list_categories(
+    session: Session = Depends(get_sync_session),
+):
+    """
+    List all menu categories.
+    """
+    from sqlalchemy import select
+    from risto_ai.database.models.menu import MenuCategory
+
+    query = select(MenuCategory).where(MenuCategory.is_active == True).order_by(MenuCategory.display_order)
+    categories = session.scalars(query).all()
+
+    return [
+        {
+            "id": cat.id,
+            "name": cat.name,
+            "description": cat.description,
+        }
+        for cat in categories
+    ]
+
+
+@router.post("/categories")
+def create_category(
+    name: str,
+    description: Optional[str] = None,
+    session: Session = Depends(get_sync_session),
+):
+    """
+    Create a new menu category.
+    """
+    from risto_ai.database.models.menu import MenuCategory
+
+    category = MenuCategory(name=name, description=description)
+    session.add(category)
+    session.flush()
+
+    return {
+        "id": category.id,
+        "name": category.name,
+        "message": "Categoria creata con successo"
+    }
